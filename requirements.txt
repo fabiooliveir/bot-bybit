@@ -1,0 +1,11 @@
+pybit>=5.7.0
+websocket-client>=1.6.0
+pandas>=2.0.0
+numpy>=1.24.0
+scikit-optimize>=0.9.0
+python-dotenv>=1.0.0
+
+
+
+
+
