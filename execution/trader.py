@@ -258,10 +258,13 @@ def run_trader() -> None:
         )
         _current_side = existing_position.side
         # Configurar trailing stop nativo da Bybit para posição existente
-        trailing_points = trailing_stop.calculate_trailing_stop_points(strategy.klines)
-        if trailing_points > 0:
-            logger.info(f"Configurando trailing stop para posição existente: {trailing_points:.0f} pontos")
-            client.set_trading_stop(Settings.SYMBOL, trailing_points)
+        if existing_position.trailing_stop > 0:
+            logger.info(f"Trailing Stop já configurado na exchange ({existing_position.trailing_stop}), mantendo configuração atual.")
+        else:
+            trailing_points = trailing_stop.calculate_trailing_stop_points(strategy.klines)
+            if trailing_points > 0:
+                logger.info(f"Configurando trailing stop para posição existente: {trailing_points:.0f} pontos")
+                client.set_trading_stop(Settings.SYMBOL, trailing_points)
 
     logger.info("Iniciando trader e aguardando sinais...")
 

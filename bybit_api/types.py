@@ -61,6 +61,7 @@ class Position:
     leverage: int
     unrealised_pnl: float
     margin: float
+    trailing_stop: float
     
     @classmethod
     def from_bybit(cls, data: Dict[str, Any]) -> Optional["Position"]:
@@ -78,7 +79,8 @@ class Position:
             mark_price=float(data.get("markPrice", 0)),
             leverage=int(data.get("leverage", 1)),
             unrealised_pnl=float(data.get("unrealisedPnl", 0)),
-            margin=float(data.get("positionMargin", 0))
+            margin=float(data.get("positionMargin", 0)),
+            trailing_stop=float(data.get("trailingStop", 0))
         )
 
 
@@ -97,6 +99,9 @@ class Balance:
             wallet_balance=float(data.get("walletBalance", 0)),
             used_margin=float(data.get("usedMargin", 0))
         )
+
+
+
 
 
 
