@@ -78,8 +78,21 @@ def _handle_new_kline(
 ):
     """Processa novo kline em tempo real."""
     global _current_side, _last_log_bucket
+    # Proteção contra dados discrepantes (ex: Testnet bug REST vs WS)
+    if strategy.klines:
+        last_close = strategy.klines[-1].close
+        
+        
+        # price_diff_pct = abs(kline.close - last_close) / last_close
+        # if price_diff_pct > 0.05:  # Removendo bloqueio temporariamente para análise
+        #    logger.warning(f"DADOS IGNORADOS: Variação > 5%: {last_close} -> {kline.close}")
+        #    return
 
+    # Atualizar klines da estratégia
     strategy.add_kline(kline)
+    
+    # Calcular IFR
+    # ...calculate_signal()
     res = strategy.calculate_signal()
 
     price = kline.close

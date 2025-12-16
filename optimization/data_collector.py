@@ -39,11 +39,19 @@ class DataCollector:
             )
             
             logger.info(f"Coletados {len(klines)} candles históricos")
+            if klines:
+                logger.info(f"Primeiro Kline: {klines[0].open_time} | Close: {klines[0].close}")
+                logger.info(f"Último Kline: {klines[-1].open_time} | Close: {klines[-1].close}")
             return klines
             
         except Exception as e:
             logger.error(f"Erro ao coletar dados históricos: {e}")
             raise
+
+
+
+
+
 
 
 
