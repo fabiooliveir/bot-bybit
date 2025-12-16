@@ -40,7 +40,7 @@ wheels/
 trading.log
 
 # Parâmetros otimizados
-optimized_params.json
+# optimized_params.json (removido - agora versionado no git)
 
 # IDEs
 .vscode/
