@@ -445,10 +445,29 @@ class BybitClient:
                 logger.error(f"Erro ao processar mensagem WebSocket: {e}")
         
         try:
-            self.ws = BybitWebSocket(
-                testnet=Settings.is_testnet(),
-                channel_type="linear"
-            )
+            # Configurar WebSocket baseado no ambiente
+            # Para streams públicos (kline), demo deve usar endpoint público do mainnet
+            # pois stream-demo.bybit.com só suporta streams privados
+            # Os dados públicos são idênticos entre demo e mainnet
+            ws_params = {
+                "channel_type": "linear"
+            }
+            
+            if Settings.ENVIRONMENT == "demo":
+                # Demo: Para streams públicos, usar endpoint do mainnet (dados são idênticos)
+                # Para streams privados, usar demo=True (mas não é o caso aqui)
+                ws_params["testnet"] = False
+                ws_params["demo"] = False
+            elif Settings.ENVIRONMENT == "testnet":
+                # Testnet: usar testnet=True
+                ws_params["testnet"] = True
+                ws_params["demo"] = False
+            else:
+                # Production: ambos False
+                ws_params["testnet"] = False
+                ws_params["demo"] = False
+            
+            self.ws = BybitWebSocket(**ws_params)
             
             self.ws.kline_stream(
                 interval=Settings.TIMEFRAME,

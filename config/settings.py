@@ -3,7 +3,7 @@ Configurações do sistema de trading Bybit
 """
 import os
 from dotenv import load_dotenv
-from typing import Dict, Any
+from typing import Dict, Any, Optional
 from enum import Enum
 
 load_dotenv()
@@ -92,6 +92,15 @@ class Settings:
     def is_testnet(cls) -> bool:
         """Retorna True se estiver em ambiente de teste"""
         return cls.ENVIRONMENT != Environment.PRODUCTION.value
+    
+    @classmethod
+    def get_websocket_domain(cls) -> Optional[str]:
+        """Retorna o domínio do WebSocket conforme o ambiente"""
+        # Demo precisa usar stream-demo.bybit.com explicitamente
+        if cls.ENVIRONMENT == Environment.DEMO.value:
+            return "stream-demo.bybit.com"
+        # Testnet e production usam configuração padrão do pybit
+        return None
     
     # Configurações de Trading
     SYMBOL = "BTCUSDT"
