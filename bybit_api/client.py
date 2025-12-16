@@ -142,12 +142,23 @@ class BybitClient:
             if not klines:
                 break
                 
-            all_klines.extend(klines)
+            # klines vem ordenado Antigo -> Novo (pois get_klines inverte)
+            # Mas estamos buscando do presente para o passado
+            # Então devemos inserir os blocos mais antigos ANTES dos blocos mais novos
+            
+            # Ex: Primeiro loop pega (Hoje 10h .. Hoje 12h)
+            # Segundo loop pega (Hoje 08h .. Hoje 10h)
+            # Resultado final deve ser (08h..10h) + (10h..12h)
+            
+            all_klines = klines + all_klines
+            
             end_time = klines[0].open_time - 1
             
             # Rate limiting
             time.sleep(0.2)
         
+        # Garantia final de ordenação por tempo
+        all_klines.sort(key=lambda k: k.open_time)
         return all_klines
     
     def get_position(self, symbol: str) -> Optional[Position]:
