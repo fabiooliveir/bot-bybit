@@ -132,7 +132,11 @@ def _handle_new_kline(
             logger.warning("Quantidade calculada inválida, não abrindo LONG.")
             return
 
-        logger.info(f"Abrindo LONG de {qty} {Settings.SYMBOL} a mercado")
+        # Tentar obter valor do IFR para log
+        rsi_val = getattr(strategy, "last_rsi", None)
+        rsi_log = f" (IFR={rsi_val:.2f})" if rsi_val is not None else ""
+        
+        logger.info(f"Abrindo LONG de {qty} {Settings.SYMBOL} a mercado{rsi_log}")
         client.place_order(
             symbol=Settings.SYMBOL,
             side=Side.BUY,
@@ -177,7 +181,11 @@ def _handle_new_kline(
             logger.warning("Quantidade calculada inválida, não abrindo SHORT.")
             return
 
-        logger.info(f"Abrindo SHORT de {qty} {Settings.SYMBOL} a mercado")
+        # Tentar obter valor do IFR para log
+        rsi_val = getattr(strategy, "last_rsi", None)
+        rsi_log = f" (IFR={rsi_val:.2f})" if rsi_val is not None else ""
+
+        logger.info(f"Abrindo SHORT de {qty} {Settings.SYMBOL} a mercado{rsi_log}")
         client.place_order(
             symbol=Settings.SYMBOL,
             side=Side.SELL,
