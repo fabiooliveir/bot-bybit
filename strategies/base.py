@@ -38,8 +38,24 @@ class BaseStrategy(ABC):
         self.klines = klines
     
     def add_kline(self, kline: Kline):
-        """Adiciona um novo kline"""
-        self.klines.append(kline)
+        """
+        Adiciona ou atualiza um kline na lista.
+        Evita duplicação de candles com mesmo timestamp (comum em WebSockets).
+        """
+        if not self.klines:
+            self.klines.append(kline)
+        else:
+            last_kline = self.klines[-1]
+            if kline.open_time == last_kline.open_time:
+                # É uma atualização do candle atual - sobrescrever
+                self.klines[-1] = kline
+            elif kline.open_time > last_kline.open_time:
+                # É um novo candle
+                self.klines.append(kline)
+            else:
+                # Candle antigo/fora de ordem - ignorar por segurança
+                return
+
         # Manter apenas os últimos N klines necessários
         max_klines = self.get_max_klines()
         if len(self.klines) > max_klines:
