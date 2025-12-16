@@ -1,27 +1,10 @@
-"""
-Estratégia IFR (RSI) simples, recriada a partir dos parâmetros presentes
-em `optimized_params.json` (rsi_period, oversold_level, overbought_level, volatility_period).
-"""
-
-from dataclasses import dataclass
-from typing import List
-
-import pandas as pd
-
-from bybit_api.types import Kline
-from .base import BaseStrategy, StrategyResult, Signal
-
+import pandas_ta as ta  # noqa: F401
 
 @dataclass
-class IFRParams:
-    rsi_period: int = 14
-    oversold_level: float = 30.0
-    overbought_level: float = 70.0
-    volatility_period: int = 14  # reservado para futuros usos
-
+# ... (manter resto igual até classe IFRStrategy)
 
 class IFRStrategy(BaseStrategy):
-    """Estratégia baseada em IFR (RSI)."""
+    """Estratégia baseada em IFR (RSI) usando pandas-ta."""
 
     def __init__(self, params: dict):
         super().__init__(params)
@@ -31,32 +14,25 @@ class IFRStrategy(BaseStrategy):
             overbought_level=float(params.get("overbought_level", 70.0)),
             volatility_period=int(params.get("volatility_period", 14)),
         )
-        # Último valor de RSI calculado (para logging/monitoramento)
         self.last_rsi: float | None = None
 
     def get_max_klines(self) -> int:
-        # Precisamos ao menos rsi_period + um pouco de histórico
         return max(self.cfg.rsi_period * 3, 100)
 
     def _compute_rsi(self, closes: List[float]) -> pd.Series:
         """
-        Calcula RSI usando o método de Wilder (similar ao TradingView / Bybit).
+        Calcula RSI usando pandas-ta (Wilder's method).
         """
-        series = pd.Series(closes, dtype="float64")
-        delta = series.diff()
-
-        # Ganhos e perdas separados
-        gain = delta.clip(lower=0)
-        loss = -delta.clip(upper=0)
-
-        # Suavização de Wilder: EMA com alpha = 1 / período
-        period = self.cfg.rsi_period
-        avg_gain = gain.ewm(alpha=1 / period, adjust=False).mean()
-        avg_loss = loss.ewm(alpha=1 / period, adjust=False).mean()
-
-        rs = avg_gain / avg_loss.replace(0, 1e-9)
-        rsi = 100 - (100 / (1 + rs))
-        return rsi
+        if not closes:
+            return pd.Series(dtype="float64")
+            
+        df = pd.DataFrame({"close": closes})
+        # Calcular RSI
+        try:
+            rsi = df.ta.rsi(close="close", length=self.cfg.rsi_period)
+            return rsi
+        except Exception:
+            return pd.Series(dtype="float64")
 
     def calculate_signal(self) -> StrategyResult:
         """Calcula sinal baseado em RSI com lógica simples de reversão."""

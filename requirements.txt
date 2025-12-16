@@ -4,6 +4,10 @@ pandas>=2.0.0
 numpy>=1.24.0
 scikit-optimize>=0.9.0
 python-dotenv>=1.0.0
+pandas_ta>=0.3.14b0
+
+
+
 
 
 

@@ -91,36 +91,31 @@ def analyze_data():
         else:
             logger.info("OK: Sem variações de preço absurdas (>1%).")
 
-        # 7. Cálculo IFR/ATR (Simulação)
+        # 7. Cálculo IFR/ATR (Simulação via pandas-ta)
+        import pandas_ta as ta
         
         # ATR (12 periodos - optimized)
         atr_period = 12
-        df["tr"] = df[["high", "low", "close"]].apply(
-            lambda x: max(x.high - x.low, abs(x.high - x.close), abs(x.low - x.close)), axis=1
-        )
-        # O calculo real usa shift no close anterior, aqui simplifiquei, mas ok
-        # Correção: ATR precisa do close anterior mesmo
-        df['prev_close'] = df['close'].shift(1)
-        df['tr'] = df.apply(lambda row: max(
-            row['high'] - row['low'],
-            abs(row['high'] - row['prev_close']) if pd.notnull(row['prev_close']) else 0,
-            abs(row['low'] - row['prev_close']) if pd.notnull(row['prev_close']) else 0
-        ), axis=1)
-        
-        df['atr'] = df['tr'].rolling(window=atr_period).mean()
-        
-        logger.info(f"ATR Médio (últimos 10): {df['atr'].tail(10).mean():.2f}")
-        logger.info(f"ATR Atual: {df['atr'].iloc[-1]:.2f}")
+        try:
+            # pandas-ta requer High, Low, Close
+            df.ta.atr(length=atr_period, append=True)
+            atr_col = f"ATRr_{atr_period}" # nome padrão do pandas-ta
+            
+            logger.info(f"ATR Médio (últimos 10): {df[atr_col].tail(10).mean():.2f}")
+            logger.info(f"ATR Atual: {df[atr_col].iloc[-1]:.2f}")
+        except Exception as e:
+            logger.error(f"Erro ao calcular ATR: {e}")
         
         # RSI (9 periodos)
         rsi_period = 9
-        delta = df['close'].diff()
-        gain = (delta.where(delta > 0, 0)).rolling(window=rsi_period).mean()
-        loss = (-delta.where(delta < 0, 0)).rolling(window=rsi_period).mean()
-        rs = gain / loss
-        df['rsi'] = 100 - (100 / (1 + rs))
-        
-        logger.info(f"RSI Atual: {df['rsi'].iloc[-1]:.2f}")
+        try:
+            df.ta.rsi(close='close', length=rsi_period, append=True)
+            rsi_col = f"RSI_{rsi_period}" # nome padrão do pandas-ta
+            
+            logger.info(f"RSI Atual: {df[rsi_col].iloc[-1]:.2f}")
+        except Exception as e:
+            logger.error(f"Erro ao calcular RSI: {e}")
+            
         logger.info(f"Preço Atual: {df['close'].iloc[-1]}")
 
     except Exception as e:

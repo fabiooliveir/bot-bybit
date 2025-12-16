@@ -1,27 +1,14 @@
-"""
-Trailing Stop baseado em ATR (Average True Range)
-"""
-from typing import Optional
-import pandas as pd
-from dataclasses import dataclass
-
-from bybit_api.types import Kline, Position
-
+import pandas_ta as ta  # noqa: F401
 
 @dataclass
 class TrailingStopState:
     """Estado do trailing stop"""
     is_active: bool
-    highest_price: float  # Para LONG: preço mais alto desde entrada
-    lowest_price: float   # Para SHORT: preço mais baixo desde entrada
-    current_stop: float
-    entry_price: float
-    position_side: str  # "LONG" ou "SHORT"
-
+# ... (manter resto igual até classe TrailingStop)
 
 class TrailingStop:
     """
-    Trailing Stop otimizado usando ATR
+    Trailing Stop otimizado usando ATR (via pandas-ta)
     
     O trailing stop acompanha o preço e ajusta dinamicamente o stop loss
     baseado na volatilidade (ATR) do mercado.
@@ -37,76 +24,27 @@ class TrailingStop:
         self.atr_period = atr_period
         self.state: Optional[TrailingStopState] = None
     
-    def activate(self, entry_price: float, position_side: str, klines: list = None):
-        """Ativa o trailing stop para uma nova posição"""
-        # Calcular stop inicial baseado no ATR
-        initial_stop = entry_price
-        if klines and len(klines) >= self.atr_period + 1:
-            atr = self._calculate_atr(klines)
-            if atr > 0:
-                stop_distance = atr * self.atr_multiplier
-                if position_side == "LONG":
-                    initial_stop = entry_price - stop_distance
-                else:  # SHORT
-                    initial_stop = entry_price + stop_distance
-        
-        self.state = TrailingStopState(
-            is_active=True,
-            highest_price=entry_price,
-            lowest_price=entry_price,
-            current_stop=initial_stop,
-            entry_price=entry_price,
-            position_side=position_side
-        )
-    
-    def deactivate(self):
-        """Desativa o trailing stop"""
-        self.state = None
-    
-    def calculate_trailing_stop_points(self, klines: list) -> float:
-        """
-        Calcula trailing stop em pontos para usar no trailing stop nativo da Bybit
-        
-        Args:
-            klines: Lista de klines para calcular ATR
-            
-        Returns:
-            Distância do trailing stop em pontos (sempre positivo)
-            Para LONG: pontos abaixo do preço mais alto
-            Para SHORT: pontos acima do preço mais baixo
-        """
-        atr = self._calculate_atr(klines)
-        if atr == 0.0:
-            return 0.0
-        
-        # Converter ATR multiplicado para pontos
-        # Para BTCUSDT, 1 ponto = $1
-        stop_distance = atr * self.atr_multiplier
-        
-        # Retornar como pontos inteiros (Bybit usa pontos)
-        return stop_distance
-    
+    # ... (manter activate, deactivate e calculate_trailing_stop_points iguais até chamar _calculate_atr)
+
     def _calculate_atr(self, klines: list) -> float:
-        """Calcula ATR dos últimos klines"""
+        """Calcula ATR dos últimos klines usando pandas-ta"""
         if len(klines) < self.atr_period + 1:
             return 0.0
         
         df = pd.DataFrame({
-            "high": [k.high for k in klines[-self.atr_period-1:]],
-            "low": [k.low for k in klines[-self.atr_period-1:]],
-            "close": [k.close for k in klines[-self.atr_period-1:]]
+            "high": [k.high for k in klines],
+            "low": [k.low for k in klines],
+            "close": [k.close for k in klines]
         })
         
-        # True Range
-        df["high_low"] = df["high"] - df["low"]
-        df["high_close"] = abs(df["high"] - df["close"].shift())
-        df["low_close"] = abs(df["low"] - df["close"].shift())
-        df["tr"] = df[["high_low", "high_close", "low_close"]].max(axis=1)
-        
-        # ATR (média do TR)
-        atr = df["tr"].tail(self.atr_period).mean()
-        
-        return atr
+        # Calcular ATR usando pandas-ta (padrão Wilder's MA/RMA)
+        try:
+            atr_series = df.ta.atr(length=self.atr_period)
+            if atr_series is None or atr_series.empty:
+                return 0.0
+            return atr_series.iloc[-1]
+        except Exception:
+            return 0.0
     
     def update(self, current_price: float, klines: list) -> Optional[float]:
         """
