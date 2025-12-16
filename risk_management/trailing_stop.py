@@ -1,10 +1,24 @@
-import pandas_ta as ta  # noqa: F401
+"""
+Trailing Stop baseado em ATR (Average True Range)
+"""
+from typing import Optional
+import pandas as pd
+import pandas_ta as ta
+from dataclasses import dataclass
+
+from bybit_api.types import Kline, Position
+
 
 @dataclass
 class TrailingStopState:
     """Estado do trailing stop"""
     is_active: bool
-# ... (manter resto igual até classe TrailingStop)
+    highest_price: float  # Para LONG: preço mais alto desde entrada
+    lowest_price: float   # Para SHORT: preço mais baixo desde entrada
+    current_stop: float
+    entry_price: float
+    position_side: str  # "LONG" ou "SHORT"
+
 
 class TrailingStop:
     """
@@ -24,8 +38,55 @@ class TrailingStop:
         self.atr_period = atr_period
         self.state: Optional[TrailingStopState] = None
     
-    # ... (manter activate, deactivate e calculate_trailing_stop_points iguais até chamar _calculate_atr)
-
+    def activate(self, entry_price: float, position_side: str, klines: list = None):
+        """Ativa o trailing stop para uma nova posição"""
+        # Calcular stop inicial baseado no ATR
+        initial_stop = entry_price
+        if klines and len(klines) >= self.atr_period + 1:
+            atr = self._calculate_atr(klines)
+            if atr > 0:
+                stop_distance = atr * self.atr_multiplier
+                if position_side == "LONG":
+                    initial_stop = entry_price - stop_distance
+                else:  # SHORT
+                    initial_stop = entry_price + stop_distance
+        
+        self.state = TrailingStopState(
+            is_active=True,
+            highest_price=entry_price,
+            lowest_price=entry_price,
+            current_stop=initial_stop,
+            entry_price=entry_price,
+            position_side=position_side
+        )
+    
+    def deactivate(self):
+        """Desativa o trailing stop"""
+        self.state = None
+    
+    def calculate_trailing_stop_points(self, klines: list) -> float:
+        """
+        Calcula trailing stop em pontos para usar no trailing stop nativo da Bybit
+        
+        Args:
+            klines: Lista de klines para calcular ATR
+            
+        Returns:
+            Distância do trailing stop em pontos (sempre positivo)
+            Para LONG: pontos abaixo do preço mais alto
+            Para SHORT: pontos acima do preço mais baixo
+        """
+        atr = self._calculate_atr(klines)
+        if atr == 0.0:
+            return 0.0
+        
+        # Converter ATR multiplicado para pontos
+        # Para BTCUSDT, 1 ponto = $1
+        stop_distance = atr * self.atr_multiplier
+        
+        # Retornar como pontos inteiros (Bybit usa pontos)
+        return stop_distance
+    
     def _calculate_atr(self, klines: list) -> float:
         """Calcula ATR dos últimos klines usando pandas-ta"""
         if len(klines) < self.atr_period + 1:
@@ -109,4 +170,3 @@ class TrailingStop:
             "atr_multiplier": (1.0, 4.0),  # Multiplicador ATR de 1.0 a 4.0
             "atr_period": (10, 20),  # Período ATR de 10 a 20
         }
-

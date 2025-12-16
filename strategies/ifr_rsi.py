@@ -1,7 +1,25 @@
-import pandas_ta as ta  # noqa: F401
+"""
+Estratégia IFR (RSI) simples, recriada a partir dos parâmetros presentes
+em `optimized_params.json` (rsi_period, oversold_level, overbought_level, volatility_period).
+"""
+
+from dataclasses import dataclass
+from typing import List
+
+import pandas as pd
+import pandas_ta as ta
+
+from bybit_api.types import Kline
+from .base import BaseStrategy, StrategyResult, Signal
+
 
 @dataclass
-# ... (manter resto igual até classe IFRStrategy)
+class IFRParams:
+    rsi_period: int = 14
+    oversold_level: float = 30.0
+    overbought_level: float = 70.0
+    volatility_period: int = 14  # reservado para futuros usos
+
 
 class IFRStrategy(BaseStrategy):
     """Estratégia baseada em IFR (RSI) usando pandas-ta."""
@@ -14,9 +32,11 @@ class IFRStrategy(BaseStrategy):
             overbought_level=float(params.get("overbought_level", 70.0)),
             volatility_period=int(params.get("volatility_period", 14)),
         )
+        # Último valor de RSI calculado (para logging/monitoramento)
         self.last_rsi: float | None = None
 
     def get_max_klines(self) -> int:
+        # Precisamos ao menos rsi_period + um pouco de histórico
         return max(self.cfg.rsi_period * 3, 100)
 
     def _compute_rsi(self, closes: List[float]) -> pd.Series:
@@ -43,6 +63,9 @@ class IFRStrategy(BaseStrategy):
 
         closes = [k.close for k in self.klines]
         rsi = self._compute_rsi(closes)
+        if rsi.empty:
+             return StrategyResult(signal=Signal.NEUTRAL, confidence=0.0, entry_price=0.0)
+
         current_rsi = float(rsi.iloc[-1])
         # Guardar para acesso externo (ex: logs do trader)
         self.last_rsi = current_rsi
@@ -52,7 +75,6 @@ class IFRStrategy(BaseStrategy):
         # Lógica básica:
         # - RSI abaixo de oversold_level -> possível compra (LONG)
         # - RSI acima de overbought_level -> possível venda (SHORT)
-        # Sem gestão de posição interna aqui; o trader decide fechar com CLOSE_LONG/CLOSE_SHORT
         if current_rsi <= self.cfg.oversold_level:
             return StrategyResult(
                 signal=Signal.LONG,
@@ -80,5 +102,3 @@ class IFRStrategy(BaseStrategy):
             "overbought_level": (60.0, 80.0),
             "volatility_period": (10, 30),
         }
-
-
