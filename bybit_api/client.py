@@ -187,7 +187,7 @@ class BybitClient:
                 logger.error("=" * 60)
             else:
                 logger.error(f"Erro ao obter posicao: {e}")
-            return None
+            raise  # Re-raise exception to avoid treating error as "no position"
     
     def get_balance(self) -> Balance:
         """Obtém saldo da conta"""
