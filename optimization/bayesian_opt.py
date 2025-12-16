@@ -9,6 +9,7 @@ import logging
 from pathlib import Path
 from typing import Dict, Any, List, Tuple
 
+import numpy as np
 from skopt import gp_minimize
 from skopt.space import Real, Integer
 
@@ -18,6 +19,19 @@ from optimization.data_collector import DataCollector
 from strategies.base import BaseStrategy
 
 logger = logging.getLogger(__name__)
+
+
+def _convert_to_native_types(obj: Any) -> Any:
+    """Converte valores numpy para tipos Python nativos para serialização JSON."""
+    if isinstance(obj, (np.integer, np.int64, np.int32)):
+        return int(obj)
+    elif isinstance(obj, (np.floating, np.float64, np.float32)):
+        return float(obj)
+    elif isinstance(obj, dict):
+        return {k: _convert_to_native_types(v) for k, v in obj.items()}
+    elif isinstance(obj, (list, tuple)):
+        return [_convert_to_native_types(item) for item in obj]
+    return obj
 
 
 def _load_strategy_class(strategy_name: str):
@@ -187,6 +201,9 @@ def run_optimization(strategy_name: str = None) -> None:
             "total_return": best_return,
         },
     }
+
+    # Converter valores numpy para tipos Python nativos
+    result = _convert_to_native_types(result)
 
     Path(Settings.OPTIMIZED_PARAMS_FILE).write_text(
         json.dumps(result, indent=2, ensure_ascii=False),
