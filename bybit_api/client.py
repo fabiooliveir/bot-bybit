@@ -327,6 +327,44 @@ class BybitClient:
             error_msg = str(e).replace('→', '->').replace('✓', '[OK]').replace('✗', '[ERRO]')
             logger.error(f"Erro ao configurar trailing stop nativo: {error_msg}")
             return False
+
+    def set_leverage(self, symbol: str, leverage: int) -> bool:
+        """
+        Define a alavancagem para o símbolo
+        
+        Args:
+            symbol: Símbolo (ex: BTCUSDT)
+            leverage: Valor da alavancagem (ex: 10)
+            
+        Returns:
+            True se sucesso ou já configurado, False se erro
+        """
+        try:
+            leverage_str = str(leverage)
+            
+            logger.info(f"Tentando definir alavancagem para {symbol}: {leverage}x")
+            
+            # Tentar definir alavancagem
+            # Nota: Isso define tanto para Buy quanto para Sell
+            self.client.set_leverage(
+                category=Settings.MARKET_TYPE,
+                symbol=symbol,
+                buyLeverage=leverage_str,
+                sellLeverage=leverage_str
+            )
+            
+            logger.info(f"Alavancagem definida com sucesso: {leverage}x")
+            return True
+            
+        except Exception as e:
+            error_msg = str(e)
+            # Code 110043: Leverage not modified (já está setado com esse valor)
+            if "110043" in error_msg:
+                logger.info(f"Alavancagem já está configurada como {leverage}x")
+                return True
+            
+            logger.error(f"Erro ao definir alavancagem: {error_msg}")
+            return False
     
     def close_position(self, symbol: str) -> bool:
         """Fecha a posição atual (se houver)"""

@@ -230,6 +230,10 @@ def run_trader() -> None:
     )
 
     client = BybitClient()
+    
+    # Configurar alavancagem na exchange para garantir que corresponda às configurações
+    client.set_leverage(Settings.SYMBOL, Settings.MAX_LEVERAGE)
+    
     position_manager = PositionManager()
 
     _init_historical_buffer(client, strategy)
