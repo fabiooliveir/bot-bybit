@@ -423,6 +423,15 @@ class BybitClient:
                         data = message.get("data", [])
                         if data:
                             kline_data = data[0]
+                            # Validar dados antes de processar
+                            try:
+                                close_price = float(kline_data.get("close", "0"))
+                                if close_price <= 0:
+                                    logger.warning(f"Ignorando kline com preço inválido: {close_price}")
+                                    return
+                            except ValueError:
+                                return
+
                             kline = Kline.from_bybit([
                                 kline_data.get("start", 0),
                                 kline_data.get("open", "0"),
