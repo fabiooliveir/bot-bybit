@@ -420,7 +420,9 @@ class BybitClient:
             import json
             import time
             try:
-                with open(r'c:\Users\fboli\Projetos\bybit\.cursor\debug.log', 'a', encoding='utf-8') as f:
+                from pathlib import Path
+                debug_log = Path(__file__).parent.parent / '.cursor' / 'debug.log'
+                with open(str(debug_log), 'a', encoding='utf-8') as f:
                     f.write(json.dumps({"sessionId":"debug-session","runId":"run1","hypothesisId":"A","location":"bybit_api/client.py:418","message":"WebSocket message received","data":{"message_type":type(message).__name__,"is_dict":isinstance(message,dict),"topic":message.get("topic","") if isinstance(message,dict) else None},"timestamp":int(time.time()*1000)})+"\n")
             except: pass
             # #endregion
@@ -433,7 +435,9 @@ class BybitClient:
                             kline_data = data[0]
                             # #region agent log
                             try:
-                                with open(r'c:\Users\fboli\Projetos\bybit\.cursor\debug.log', 'a', encoding='utf-8') as f:
+                                from pathlib import Path
+                                debug_log = Path(__file__).parent.parent / '.cursor' / 'debug.log'
+                                with open(str(debug_log), 'a', encoding='utf-8') as f:
                                     f.write(json.dumps({"sessionId":"debug-session","runId":"run1","hypothesisId":"A","location":"bybit_api/client.py:424","message":"Kline data found in message","data":{"topic":topic,"data_len":len(data),"close":kline_data.get("close","0"),"start":kline_data.get("start",0)},"timestamp":int(time.time()*1000)})+"\n")
                             except: pass
                             # #endregion
@@ -456,7 +460,9 @@ class BybitClient:
                             ])
                             # #region agent log
                             try:
-                                with open(r'c:\Users\fboli\Projetos\bybit\.cursor\debug.log', 'a', encoding='utf-8') as f:
+                                from pathlib import Path
+                                debug_log = Path(__file__).parent.parent / '.cursor' / 'debug.log'
+                                with open(str(debug_log), 'a', encoding='utf-8') as f:
                                     f.write(json.dumps({"sessionId":"debug-session","runId":"run1","hypothesisId":"B","location":"bybit_api/client.py:443","message":"Calling callback with kline","data":{"kline_open_time":kline.open_time,"kline_close":kline.close},"timestamp":int(time.time()*1000)})+"\n")
                             except: pass
                             # #endregion

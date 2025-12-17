@@ -81,7 +81,9 @@ def _handle_new_kline(
     import json
     import time
     try:
-        with open(r'c:\Users\fboli\Projetos\bybit\.cursor\debug.log', 'a', encoding='utf-8') as f:
+        from pathlib import Path
+        debug_log = Path(__file__).parent.parent / '.cursor' / 'debug.log'
+        with open(str(debug_log), 'a', encoding='utf-8') as f:
             f.write(json.dumps({"sessionId":"debug-session","runId":"run1","hypothesisId":"C","location":"execution/trader.py:79","message":"_handle_new_kline entry","data":{"kline_open_time":kline.open_time,"kline_close":kline.close,"strategy_klines_count":len(strategy.klines)},"timestamp":int(time.time()*1000)})+"\n")
     except: pass
     # #endregion
@@ -104,7 +106,9 @@ def _handle_new_kline(
     res = strategy.calculate_signal()
     # #region agent log
     try:
-        with open(r'c:\Users\fboli\Projetos\bybit\.cursor\debug.log', 'a', encoding='utf-8') as f:
+        from pathlib import Path
+        debug_log = Path(__file__).parent.parent / '.cursor' / 'debug.log'
+        with open(str(debug_log), 'a', encoding='utf-8') as f:
             f.write(json.dumps({"sessionId":"debug-session","runId":"run1","hypothesisId":"C","location":"execution/trader.py:96","message":"After calculate_signal","data":{"signal":res.signal.name,"last_rsi":getattr(strategy,"last_rsi",None),"last_atr":getattr(strategy,"last_atr",None)},"timestamp":int(time.time()*1000)})+"\n")
     except: pass
     # #endregion
@@ -130,7 +134,9 @@ def _handle_new_kline(
     bucket = kline.open_time // interval_ms
     # #region agent log
     try:
-        with open(r'c:\Users\fboli\Projetos\bybit\.cursor\debug.log', 'a', encoding='utf-8') as f:
+        from pathlib import Path
+        debug_log = Path(__file__).parent.parent / '.cursor' / 'debug.log'
+        with open(str(debug_log), 'a', encoding='utf-8') as f:
             f.write(json.dumps({"sessionId":"debug-session","runId":"run1","hypothesisId":"D","location":"execution/trader.py:116","message":"Bucket calculation","data":{"bucket":bucket,"last_log_bucket":_last_log_bucket,"bucket_changed":bucket != _last_log_bucket},"timestamp":int(time.time()*1000)})+"\n")
     except: pass
     # #endregion
@@ -142,7 +148,9 @@ def _handle_new_kline(
         atr_value = getattr(strategy, "last_atr", None)
         # #region agent log
         try:
-            with open(r'c:\Users\fboli\Projetos\bybit\.cursor\debug.log', 'a', encoding='utf-8') as f:
+            from pathlib import Path
+            debug_log = Path(__file__).parent.parent / '.cursor' / 'debug.log'
+            with open(str(debug_log), 'a', encoding='utf-8') as f:
                 f.write(json.dumps({"sessionId":"debug-session","runId":"run1","hypothesisId":"D","location":"execution/trader.py:124","message":"About to log IFR/ATR","data":{"rsi_value":rsi_value,"atr_value":atr_value,"will_log":rsi_value is not None},"timestamp":int(time.time()*1000)})+"\n")
         except: pass
         # #endregion
@@ -335,7 +343,9 @@ def run_trader() -> None:
         import json
         import time
         try:
-            with open(r'c:\Users\fboli\Projetos\bybit\.cursor\debug.log', 'a', encoding='utf-8') as f:
+            from pathlib import Path
+            debug_log = Path(__file__).parent.parent / '.cursor' / 'debug.log'
+            with open(str(debug_log), 'a', encoding='utf-8') as f:
                 f.write(json.dumps({"sessionId":"debug-session","runId":"run1","hypothesisId":"B","location":"execution/trader.py:308","message":"ws_callback invoked","data":{"kline_open_time":k.open_time,"kline_close":k.close,"stop_event_set":_stop_event.is_set()},"timestamp":int(time.time()*1000)})+"\n")
         except: pass
         # #endregion

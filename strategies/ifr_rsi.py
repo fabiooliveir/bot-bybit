@@ -104,7 +104,9 @@ class IFRStrategy(BaseStrategy):
         import json
         import time
         try:
-            with open(r'c:\Users\fboli\Projetos\bybit\.cursor\debug.log', 'a', encoding='utf-8') as f:
+            from pathlib import Path
+            debug_log = Path(__file__).parent.parent / '.cursor' / 'debug.log'
+            with open(str(debug_log), 'a', encoding='utf-8') as f:
                 f.write(json.dumps({"sessionId":"debug-session","runId":"run1","hypothesisId":"E","location":"strategies/ifr_rsi.py:102","message":"ATR series computed","data":{"atr_series_empty":atr_series.empty,"atr_series_len":len(atr_series) if not atr_series.empty else 0,"atr_lookback_period":self.cfg.atr_lookback_period,"atr_min_mult":self.cfg.atr_min_multiplier,"atr_max_mult":self.cfg.atr_max_multiplier},"timestamp":int(time.time()*1000)})+"\n")
         except: pass
         # #endregion
@@ -128,7 +130,9 @@ class IFRStrategy(BaseStrategy):
             self.last_atr = current_atr
             # #region agent log
             try:
-                with open(r'c:\Users\fboli\Projetos\bybit\.cursor\debug.log', 'a', encoding='utf-8') as f:
+                from pathlib import Path
+                debug_log = Path(__file__).parent.parent / '.cursor' / 'debug.log'
+                with open(str(debug_log), 'a', encoding='utf-8') as f:
                     f.write(json.dumps({"sessionId":"debug-session","runId":"run1","hypothesisId":"F","location":"strategies/ifr_rsi.py:120","message":"ATR filter check","data":{"atr_mean":atr_mean,"atr_min":atr_min,"atr_max":atr_max,"current_atr":current_atr,"is_outlier":current_atr < atr_min or current_atr > atr_max},"timestamp":int(time.time()*1000)})+"\n")
             except: pass
             # #endregion
@@ -146,7 +150,9 @@ class IFRStrategy(BaseStrategy):
             self.last_atr = float(atr_series.iloc[-1])
             # #region agent log
             try:
-                with open(r'c:\Users\fboli\Projetos\bybit\.cursor\debug.log', 'a', encoding='utf-8') as f:
+                from pathlib import Path
+                debug_log = Path(__file__).parent.parent / '.cursor' / 'debug.log'
+                with open(str(debug_log), 'a', encoding='utf-8') as f:
                     f.write(json.dumps({"sessionId":"debug-session","runId":"run1","hypothesisId":"E","location":"strategies/ifr_rsi.py:132","message":"ATR set but filter disabled","data":{"last_atr":self.last_atr},"timestamp":int(time.time()*1000)})+"\n")
             except: pass
             # #endregion
@@ -154,7 +160,9 @@ class IFRStrategy(BaseStrategy):
             self.last_atr = None
             # #region agent log
             try:
-                with open(r'c:\Users\fboli\Projetos\bybit\.cursor\debug.log', 'a', encoding='utf-8') as f:
+                from pathlib import Path
+                debug_log = Path(__file__).parent.parent / '.cursor' / 'debug.log'
+                with open(str(debug_log), 'a', encoding='utf-8') as f:
                     f.write(json.dumps({"sessionId":"debug-session","runId":"run1","hypothesisId":"E","location":"strategies/ifr_rsi.py:134","message":"ATR series empty","data":{},"timestamp":int(time.time()*1000)})+"\n")
             except: pass
             # #endregion
