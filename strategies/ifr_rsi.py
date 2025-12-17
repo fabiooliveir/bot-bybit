@@ -98,6 +98,16 @@ class IFRStrategy(BaseStrategy):
 
         current_price = self.klines[-1].close if self.klines else 0.0
         
+        # Calcular RSI primeiro (sempre, para logging)
+        closes = [k.close for k in self.klines]
+        rsi = self._compute_rsi(closes)
+        if rsi.empty:
+             return StrategyResult(signal=Signal.NEUTRAL, confidence=0.0, entry_price=current_price)
+
+        current_rsi = float(rsi.iloc[-1])
+        # Guardar para acesso externo (ex: logs do trader) - SEMPRE calcular e setar
+        self.last_rsi = current_rsi
+        
         # Calcular série de ATR para filtro de volatilidade
         atr_series = self._compute_atr(self.klines)
         # #region agent log
@@ -139,7 +149,7 @@ class IFRStrategy(BaseStrategy):
             
             # Filtro de volatilidade: verificar se ATR atual está no range da média
             if current_atr < atr_min or current_atr > atr_max:
-                # Outlier de volatilidade - bloquear entrada
+                # Outlier de volatilidade - bloquear entrada (mas RSI já foi calculado para logging)
                 return StrategyResult(
                     signal=Signal.NEUTRAL,
                     confidence=0.0,
@@ -168,14 +178,6 @@ class IFRStrategy(BaseStrategy):
             # #endregion
 
         # ATR OK (dentro do range normal ou filtro desabilitado) - aplicar lógica RSI
-        closes = [k.close for k in self.klines]
-        rsi = self._compute_rsi(closes)
-        if rsi.empty:
-             return StrategyResult(signal=Signal.NEUTRAL, confidence=0.0, entry_price=current_price)
-
-        current_rsi = float(rsi.iloc[-1])
-        # Guardar para acesso externo (ex: logs do trader)
-        self.last_rsi = current_rsi
 
         # Lógica básica:
         # - RSI abaixo de oversold_level -> possível compra (LONG)
