@@ -77,6 +77,14 @@ def _handle_new_kline(
     trailing_stop: TrailingStop,
 ):
     """Processa novo kline em tempo real."""
+    # #region agent log
+    import json
+    import time
+    try:
+        with open(r'c:\Users\fboli\Projetos\bybit\.cursor\debug.log', 'a', encoding='utf-8') as f:
+            f.write(json.dumps({"sessionId":"debug-session","runId":"run1","hypothesisId":"C","location":"execution/trader.py:79","message":"_handle_new_kline entry","data":{"kline_open_time":kline.open_time,"kline_close":kline.close,"strategy_klines_count":len(strategy.klines)},"timestamp":int(time.time()*1000)})+"\n")
+    except: pass
+    # #endregion
     global _current_side, _last_log_bucket
     # Prote├º├úo contra dados discrepantes (ex: Testnet bug REST vs WS)
     if strategy.klines:
@@ -94,6 +102,12 @@ def _handle_new_kline(
     # Calcular IFR
     # ...calculate_signal()
     res = strategy.calculate_signal()
+    # #region agent log
+    try:
+        with open(r'c:\Users\fboli\Projetos\bybit\.cursor\debug.log', 'a', encoding='utf-8') as f:
+            f.write(json.dumps({"sessionId":"debug-session","runId":"run1","hypothesisId":"C","location":"execution/trader.py:96","message":"After calculate_signal","data":{"signal":res.signal.name,"last_rsi":getattr(strategy,"last_rsi",None),"last_atr":getattr(strategy,"last_atr",None)},"timestamp":int(time.time()*1000)})+"\n")
+    except: pass
+    # #endregion
 
     price = kline.close
     position = client.get_position(Settings.SYMBOL)
@@ -114,13 +128,24 @@ def _handle_new_kline(
         interval_minutes = 5
     interval_ms = interval_minutes * 60 * 1000
     bucket = kline.open_time // interval_ms
+    # #region agent log
+    try:
+        with open(r'c:\Users\fboli\Projetos\bybit\.cursor\debug.log', 'a', encoding='utf-8') as f:
+            f.write(json.dumps({"sessionId":"debug-session","runId":"run1","hypothesisId":"D","location":"execution/trader.py:116","message":"Bucket calculation","data":{"bucket":bucket,"last_log_bucket":_last_log_bucket,"bucket_changed":bucket != _last_log_bucket},"timestamp":int(time.time()*1000)})+"\n")
+    except: pass
+    # #endregion
 
     if bucket != _last_log_bucket:
         _last_log_bucket = bucket
         # Logar valor do IFR e ATR se a estratégia tiver esses atributos
         rsi_value = getattr(strategy, "last_rsi", None)
         atr_value = getattr(strategy, "last_atr", None)
-        
+        # #region agent log
+        try:
+            with open(r'c:\Users\fboli\Projetos\bybit\.cursor\debug.log', 'a', encoding='utf-8') as f:
+                f.write(json.dumps({"sessionId":"debug-session","runId":"run1","hypothesisId":"D","location":"execution/trader.py:124","message":"About to log IFR/ATR","data":{"rsi_value":rsi_value,"atr_value":atr_value,"will_log":rsi_value is not None},"timestamp":int(time.time()*1000)})+"\n")
+        except: pass
+        # #endregion
         if rsi_value is not None:
             if atr_value is not None:
                 logger.info(
@@ -306,6 +331,14 @@ def run_trader() -> None:
     logger.info("Iniciando trader e aguardando sinais...")
 
     def ws_callback(k: Kline):
+        # #region agent log
+        import json
+        import time
+        try:
+            with open(r'c:\Users\fboli\Projetos\bybit\.cursor\debug.log', 'a', encoding='utf-8') as f:
+                f.write(json.dumps({"sessionId":"debug-session","runId":"run1","hypothesisId":"B","location":"execution/trader.py:308","message":"ws_callback invoked","data":{"kline_open_time":k.open_time,"kline_close":k.close,"stop_event_set":_stop_event.is_set()},"timestamp":int(time.time()*1000)})+"\n")
+        except: pass
+        # #endregion
         if _stop_event.is_set():
             return
         try:

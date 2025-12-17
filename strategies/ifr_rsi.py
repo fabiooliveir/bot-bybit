@@ -100,6 +100,14 @@ class IFRStrategy(BaseStrategy):
         
         # Calcular série de ATR para filtro de volatilidade
         atr_series = self._compute_atr(self.klines)
+        # #region agent log
+        import json
+        import time
+        try:
+            with open(r'c:\Users\fboli\Projetos\bybit\.cursor\debug.log', 'a', encoding='utf-8') as f:
+                f.write(json.dumps({"sessionId":"debug-session","runId":"run1","hypothesisId":"E","location":"strategies/ifr_rsi.py:102","message":"ATR series computed","data":{"atr_series_empty":atr_series.empty,"atr_series_len":len(atr_series) if not atr_series.empty else 0,"atr_lookback_period":self.cfg.atr_lookback_period,"atr_min_mult":self.cfg.atr_min_multiplier,"atr_max_mult":self.cfg.atr_max_multiplier},"timestamp":int(time.time()*1000)})+"\n")
+        except: pass
+        # #endregion
         
         # Aplicar filtro ATR se houver histórico suficiente e filtro estiver habilitado
         if (not atr_series.empty and 
@@ -118,6 +126,12 @@ class IFRStrategy(BaseStrategy):
             # ATR atual
             current_atr = float(atr_series.iloc[-1])
             self.last_atr = current_atr
+            # #region agent log
+            try:
+                with open(r'c:\Users\fboli\Projetos\bybit\.cursor\debug.log', 'a', encoding='utf-8') as f:
+                    f.write(json.dumps({"sessionId":"debug-session","runId":"run1","hypothesisId":"F","location":"strategies/ifr_rsi.py:120","message":"ATR filter check","data":{"atr_mean":atr_mean,"atr_min":atr_min,"atr_max":atr_max,"current_atr":current_atr,"is_outlier":current_atr < atr_min or current_atr > atr_max},"timestamp":int(time.time()*1000)})+"\n")
+            except: pass
+            # #endregion
             
             # Filtro de volatilidade: verificar se ATR atual está no range da média
             if current_atr < atr_min or current_atr > atr_max:
@@ -130,8 +144,20 @@ class IFRStrategy(BaseStrategy):
         elif not atr_series.empty:
             # Guardar ATR atual mesmo se filtro não estiver ativo
             self.last_atr = float(atr_series.iloc[-1])
+            # #region agent log
+            try:
+                with open(r'c:\Users\fboli\Projetos\bybit\.cursor\debug.log', 'a', encoding='utf-8') as f:
+                    f.write(json.dumps({"sessionId":"debug-session","runId":"run1","hypothesisId":"E","location":"strategies/ifr_rsi.py:132","message":"ATR set but filter disabled","data":{"last_atr":self.last_atr},"timestamp":int(time.time()*1000)})+"\n")
+            except: pass
+            # #endregion
         else:
             self.last_atr = None
+            # #region agent log
+            try:
+                with open(r'c:\Users\fboli\Projetos\bybit\.cursor\debug.log', 'a', encoding='utf-8') as f:
+                    f.write(json.dumps({"sessionId":"debug-session","runId":"run1","hypothesisId":"E","location":"strategies/ifr_rsi.py:134","message":"ATR series empty","data":{},"timestamp":int(time.time()*1000)})+"\n")
+            except: pass
+            # #endregion
 
         # ATR OK (dentro do range normal ou filtro desabilitado) - aplicar lógica RSI
         closes = [k.close for k in self.klines]

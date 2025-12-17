@@ -416,6 +416,14 @@ class BybitClient:
     def setup_websocket(self, symbol: str, callback):
         """Configura WebSocket para receber dados em tempo real"""
         def handle_message(message):
+            # #region agent log
+            import json
+            import time
+            try:
+                with open(r'c:\Users\fboli\Projetos\bybit\.cursor\debug.log', 'a', encoding='utf-8') as f:
+                    f.write(json.dumps({"sessionId":"debug-session","runId":"run1","hypothesisId":"A","location":"bybit_api/client.py:418","message":"WebSocket message received","data":{"message_type":type(message).__name__,"is_dict":isinstance(message,dict),"topic":message.get("topic","") if isinstance(message,dict) else None},"timestamp":int(time.time()*1000)})+"\n")
+            except: pass
+            # #endregion
             try:
                 if isinstance(message, dict):
                     topic = message.get("topic", "")
@@ -423,6 +431,12 @@ class BybitClient:
                         data = message.get("data", [])
                         if data:
                             kline_data = data[0]
+                            # #region agent log
+                            try:
+                                with open(r'c:\Users\fboli\Projetos\bybit\.cursor\debug.log', 'a', encoding='utf-8') as f:
+                                    f.write(json.dumps({"sessionId":"debug-session","runId":"run1","hypothesisId":"A","location":"bybit_api/client.py:424","message":"Kline data found in message","data":{"topic":topic,"data_len":len(data),"close":kline_data.get("close","0"),"start":kline_data.get("start",0)},"timestamp":int(time.time()*1000)})+"\n")
+                            except: pass
+                            # #endregion
                             # Validar dados antes de processar
                             try:
                                 close_price = float(kline_data.get("close", "0"))
@@ -440,6 +454,12 @@ class BybitClient:
                                 kline_data.get("close", "0"),
                                 kline_data.get("volume", "0")
                             ])
+                            # #region agent log
+                            try:
+                                with open(r'c:\Users\fboli\Projetos\bybit\.cursor\debug.log', 'a', encoding='utf-8') as f:
+                                    f.write(json.dumps({"sessionId":"debug-session","runId":"run1","hypothesisId":"B","location":"bybit_api/client.py:443","message":"Calling callback with kline","data":{"kline_open_time":kline.open_time,"kline_close":kline.close},"timestamp":int(time.time()*1000)})+"\n")
+                            except: pass
+                            # #endregion
                             callback(kline)
             except Exception as e:
                 logger.error(f"Erro ao processar mensagem WebSocket: {e}")
