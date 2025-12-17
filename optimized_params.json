@@ -1,19 +1,23 @@
 {
   "strategy": {
-    "rsi_period": 9,
-    "oversold_level": 27.82121215146482,
-    "overbought_level": 63.644721755761246,
-    "volatility_period": 25
+    "rsi_period": 6,
+    "oversold_level": 34.4399754453365,
+    "overbought_level": 78.771054180315,
+    "volatility_period": 10,
+    "atr_period": 30,
+    "atr_lookback_period": 35,
+    "atr_min_multiplier": 0.6504878444394528,
+    "atr_max_multiplier": 1.0141326104394348
   },
   "strategy_name": "IFRStrategy",
   "trailing_stop": {
-    "atr_multiplier": 2.2754676234737343,
-    "atr_period": 12
+    "atr_multiplier": 1.0691872751242473,
+    "atr_period": 15
   },
   "symbol": "BTCUSDT",
   "timeframe": "5",
   "metrics": {
-    "total_return": 0.5528716624570609,
-    "total_trades": 460
+    "total_return": 0.5312396703222302,
+    "total_trades": 520
   }
 }
