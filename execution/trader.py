@@ -117,12 +117,19 @@ def _handle_new_kline(
 
     if bucket != _last_log_bucket:
         _last_log_bucket = bucket
-        # Logar valor do IFR se a estratégia tiver esse atributo
+        # Logar valor do IFR e ATR se a estratégia tiver esses atributos
         rsi_value = getattr(strategy, "last_rsi", None)
+        atr_value = getattr(strategy, "last_atr", None)
+        
         if rsi_value is not None:
-            logger.info(
-                f"IFR({interval_minutes}) atual = {rsi_value:.2f} para {Settings.SYMBOL} (timeframe {Settings.TIMEFRAME})"
-            )
+            if atr_value is not None:
+                logger.info(
+                    f"IFR({interval_minutes}) atual = {rsi_value:.2f} | ATR atual = {atr_value:.2f} para {Settings.SYMBOL} (timeframe {Settings.TIMEFRAME})"
+                )
+            else:
+                logger.info(
+                    f"IFR({interval_minutes}) atual = {rsi_value:.2f} para {Settings.SYMBOL} (timeframe {Settings.TIMEFRAME})"
+                )
 
     # Atualizar trailing stop se houver posi├º├úo
     if position and position.size > 0:
