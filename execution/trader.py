@@ -1,9 +1,9 @@
 """
 Loop principal de trading em tempo real.
 
-Recriação simplificada que:
-- carrega parâmetros de `optimized_params.json`;
-- instancia a estratégia e o trailing stop;
+Recria├º├úo simplificada que:
+- carrega par├ómetros de `optimized_params.json`;
+- instancia a estrat├®gia e o trailing stop;
 - usa `BybitClient` para WebSocket e ordens.
 """
 
@@ -27,23 +27,23 @@ logger = logging.getLogger(__name__)
 
 _stop_event = threading.Event()
 _current_side: Optional[PositionSide] = None
-# Último "bucket" de candle (para logar no ritmo do timeframe, ex: a cada 5 minutos)
+# ├Ültimo "bucket" de candle (para logar no ritmo do timeframe, ex: a cada 5 minutos)
 _last_log_bucket: Optional[int] = None
 
 
 def _load_optimized_params() -> dict:
-    """Carrega arquivo de parâmetros otimizados."""
+    """Carrega arquivo de par├ómetros otimizados."""
     path = Path(Settings.OPTIMIZED_PARAMS_FILE)
     if not path.exists():
         raise FileNotFoundError(
-            f"Arquivo '{Settings.OPTIMIZED_PARAMS_FILE}' não encontrado. "
+            f"Arquivo '{Settings.OPTIMIZED_PARAMS_FILE}' n├úo encontrado. "
             "Rode primeiro: python main.py --optimize"
         )
     return json.loads(path.read_text(encoding="utf-8"))
 
 
 def _load_strategy_from_params(opt_params: dict) -> BaseStrategy:
-    """Instancia estratégia a partir do JSON de parâmetros."""
+    """Instancia estrat├®gia a partir do JSON de par├ómetros."""
     from importlib import import_module
 
     strategy_name = opt_params.get("strategy_name", "IFRStrategy")
@@ -51,7 +51,7 @@ def _load_strategy_from_params(opt_params: dict) -> BaseStrategy:
         "IFRStrategy": ("strategies.ifr_rsi", "IFRStrategy"),
     }
     if strategy_name not in mapping:
-        raise ValueError(f"Estratégia '{strategy_name}' não suportada nesta recriação.")
+        raise ValueError(f"Estrat├®gia '{strategy_name}' n├úo suportada nesta recria├º├úo.")
 
     module_name, class_name = mapping[strategy_name]
     module = import_module(module_name)
@@ -61,7 +61,7 @@ def _load_strategy_from_params(opt_params: dict) -> BaseStrategy:
 
 
 def _init_historical_buffer(client: BybitClient, strategy: BaseStrategy) -> List[Kline]:
-    """Inicializa buffer de klines históricos para a estratégia."""
+    """Inicializa buffer de klines hist├│ricos para a estrat├®gia."""
     collector = DataCollector()
     klines = collector.collect_historical_data(days=3)
     strategy.update_klines(klines[-strategy.get_max_klines() :])
@@ -78,17 +78,17 @@ def _handle_new_kline(
 ):
     """Processa novo kline em tempo real."""
     global _current_side, _last_log_bucket
-    # Proteção contra dados discrepantes (ex: Testnet bug REST vs WS)
+    # Prote├º├úo contra dados discrepantes (ex: Testnet bug REST vs WS)
     if strategy.klines:
         last_close = strategy.klines[-1].close
         
         
         # price_diff_pct = abs(kline.close - last_close) / last_close
-        # if price_diff_pct > 0.05:  # Removendo bloqueio temporariamente para análise
-        #    logger.warning(f"DADOS IGNORADOS: Variação > 5%: {last_close} -> {kline.close}")
+        # if price_diff_pct > 0.05:  # Removendo bloqueio temporariamente para an├ílise
+        #    logger.warning(f"DADOS IGNORADOS: Varia├º├úo > 5%: {last_close} -> {kline.close}")
         #    return
 
-    # Atualizar klines da estratégia
+    # Atualizar klines da estrat├®gia
     strategy.add_kline(kline)
     
     # Calcular IFR
@@ -97,8 +97,17 @@ def _handle_new_kline(
 
     price = kline.close
     position = client.get_position(Settings.SYMBOL)
+    
+    # Sincronizar _current_side com a posição real da API
+    global _current_side
+    if position and position.size > 0:
+        _current_side = position.side
+    else:
+        _current_side = None
 
-    # Log do indicador no ritmo do timeframe (ex: exatamente a cada 5 minutos)
+    # Log do indicador no início de cada novo candle (seguindo o padrão do timeframe)
+    # Exemplo: se TIMEFRAME=5, loga às 9h05, 9h10, 9h15, etc.
+    # Exemplo: se TIMEFRAME=15, loga às 9h00, 9h15, 9h30, etc.
     try:
         interval_minutes = int(Settings.TIMEFRAME)
     except ValueError:
@@ -115,7 +124,7 @@ def _handle_new_kline(
                 f"IFR({interval_minutes}) atual = {rsi_value:.2f} para {Settings.SYMBOL} (timeframe {Settings.TIMEFRAME})"
             )
 
-    # Atualizar trailing stop se houver posição
+    # Atualizar trailing stop se houver posi├º├úo
     if position and position.size > 0:
         pos_side = "LONG" if position.side == PositionSide.LONG else "SHORT"
         if trailing_stop.state is None:
@@ -123,17 +132,21 @@ def _handle_new_kline(
 
         stop_price = trailing_stop.update(current_price=price, klines=strategy.klines)
         if stop_price is not None:
-            logger.info(f"Preço atingiu trailing stop ({stop_price:.2f}), fechando posição")
+            logger.info(f"Pre├ºo atingiu trailing stop ({stop_price:.2f}), fechando posi├º├úo")
             client.close_position(Settings.SYMBOL)
             trailing_stop.deactivate()
             return
 
     # Sinais de abertura/fechamento
     if res.signal == Signal.LONG:
-        # Usar estado interno para evitar múltiplas entradas antes da posição aparecer na API
-        if _current_side == PositionSide.LONG:
-            logger.debug("Já em posição LONG (estado interno), ignorando sinal LONG.")
+        # Verificar posição real da API antes de ignorar sinal
+        if position and position.size > 0 and position.side == PositionSide.LONG:
+            logger.debug("Já em posição LONG (API), ignorando sinal LONG.")
             return
+        # Se estado interno está dessincronizado, corrigir
+        if _current_side == PositionSide.LONG and (not position or position.size == 0):
+            logger.info("Corrigindo estado interno: posição LONG não existe mais na API")
+            _current_side = None
 
         balance = client.get_balance()
         qty = position_manager.calculate_position_size(
@@ -142,7 +155,7 @@ def _handle_new_kline(
             leverage=Settings.MAX_LEVERAGE,
         )
         if qty <= 0:
-            logger.warning("Quantidade calculada inválida, não abrindo LONG.")
+            logger.warning("Quantidade calculada inv├ílida, n├úo abrindo LONG.")
             return
 
         # Tentar obter valor do IFR para log
@@ -157,7 +170,7 @@ def _handle_new_kline(
             qty=qty,
         )
         
-        # Aguardar um pouco para a posição ser confirmada
+        # Aguardar um pouco para a posi├º├úo ser confirmada
         time.sleep(1)
         
         # Ativar trailing stop localmente
@@ -173,16 +186,20 @@ def _handle_new_kline(
             else:
                 logger.warning("Falha ao configurar trailing stop nativo, usando apenas controle local")
         else:
-            logger.warning("Trailing stop calculado como 0, não configurando na exchange")
+            logger.warning("Trailing stop calculado como 0, n├úo configurando na exchange")
 
         # Atualizar estado interno
         _current_side = PositionSide.LONG
 
     elif res.signal == Signal.SHORT:
-        # Usar estado interno para evitar múltiplas entradas antes da posição aparecer na API
-        if _current_side == PositionSide.SHORT:
-            logger.debug("Já em posição SHORT (estado interno), ignorando sinal SHORT.")
+        # Verificar posição real da API antes de ignorar sinal
+        if position and position.size > 0 and position.side == PositionSide.SHORT:
+            logger.debug("Já em posição SHORT (API), ignorando sinal SHORT.")
             return
+        # Se estado interno está dessincronizado, corrigir
+        if _current_side == PositionSide.SHORT and (not position or position.size == 0):
+            logger.info("Corrigindo estado interno: posição SHORT não existe mais na API")
+            _current_side = None
 
         balance = client.get_balance()
         qty = position_manager.calculate_position_size(
@@ -191,7 +208,7 @@ def _handle_new_kline(
             leverage=Settings.MAX_LEVERAGE,
         )
         if qty <= 0:
-            logger.warning("Quantidade calculada inválida, não abrindo SHORT.")
+            logger.warning("Quantidade calculada inv├ílida, n├úo abrindo SHORT.")
             return
 
         # Tentar obter valor do IFR para log
@@ -206,7 +223,7 @@ def _handle_new_kline(
             qty=qty,
         )
         
-        # Aguardar um pouco para a posição ser confirmada
+        # Aguardar um pouco para a posi├º├úo ser confirmada
         time.sleep(1)
         
         # Ativar trailing stop localmente
@@ -222,21 +239,21 @@ def _handle_new_kline(
             else:
                 logger.warning("Falha ao configurar trailing stop nativo, usando apenas controle local")
         else:
-            logger.warning("Trailing stop calculado como 0, não configurando na exchange")
+            logger.warning("Trailing stop calculado como 0, n├úo configurando na exchange")
 
         # Atualizar estado interno
         _current_side = PositionSide.SHORT
 
     elif res.signal in (Signal.CLOSE_LONG, Signal.CLOSE_SHORT):
         if position and position.size > 0:
-            logger.info("Sinal de fechamento recebido, fechando posição atual.")
+            logger.info("Sinal de fechamento recebido, fechando posi├º├úo atual.")
             if client.close_position(Settings.SYMBOL):
                 trailing_stop.deactivate()
                 _current_side = None
 
 
 def run_trader() -> None:
-    """Função principal para iniciar o trader."""
+    """Fun├º├úo principal para iniciar o trader."""
     global _stop_event, _current_side, _last_log_bucket
     _stop_event.clear()
     _current_side = None
@@ -252,31 +269,31 @@ def run_trader() -> None:
 
     client = BybitClient()
     
-    # Configurar alavancagem na exchange para garantir que corresponda às configurações
+    # Configurar alavancagem na exchange para garantir que corresponda ├ás configura├º├Áes
     client.set_leverage(Settings.SYMBOL, Settings.MAX_LEVERAGE)
     
     position_manager = PositionManager()
 
     _init_historical_buffer(client, strategy)
     
-    # Verificar se já existe posição aberta e configurar trailing stop
+    # Verificar se j├í existe posi├º├úo aberta e configurar trailing stop
     existing_position = client.get_position(Settings.SYMBOL)
     if existing_position and existing_position.size > 0:
         pos_side = "LONG" if existing_position.side == PositionSide.LONG else "SHORT"
-        logger.info(f"Posição existente encontrada: {pos_side} de {existing_position.size} {Settings.SYMBOL}")
+        logger.info(f"Posi├º├úo existente encontrada: {pos_side} de {existing_position.size} {Settings.SYMBOL}")
         trailing_stop.activate(
             entry_price=existing_position.entry_price,
             position_side=pos_side,
             klines=strategy.klines
         )
         _current_side = existing_position.side
-        # Configurar trailing stop nativo da Bybit para posição existente
+        # Configurar trailing stop nativo da Bybit para posi├º├úo existente
         if existing_position.trailing_stop > 0:
-            logger.info(f"Trailing Stop já configurado na exchange ({existing_position.trailing_stop}), mantendo configuração atual.")
+            logger.info(f"Trailing Stop j├í configurado na exchange ({existing_position.trailing_stop}), mantendo configura├º├úo atual.")
         else:
             trailing_points = trailing_stop.calculate_trailing_stop_points(strategy.klines)
             if trailing_points > 0:
-                logger.info(f"Configurando trailing stop para posição existente: {trailing_points:.0f} pontos")
+                logger.info(f"Configurando trailing stop para posi├º├úo existente: {trailing_points:.0f} pontos")
                 client.set_trading_stop(Settings.SYMBOL, trailing_points)
 
     logger.info("Iniciando trader e aguardando sinais...")
@@ -298,7 +315,7 @@ def run_trader() -> None:
     client.setup_websocket(Settings.SYMBOL, ws_callback)
 
     def handle_sigint(signum, frame):
-        logger.info("Interrupção recebida, parando trader...")
+        logger.info("Interrup├º├úo recebida, parando trader...")
         _stop_event.set()
 
     signal.signal(signal.SIGINT, handle_sigint)

@@ -115,39 +115,83 @@ def _params_from_vector(dim_names: List[str], x: List[float]) -> Tuple[Dict[str,
 def _backtest(
     strategy_cls: type,
     strategy_params: Dict[str, Any],
+    ts_params: Dict[str, Any],
     klines: List[Kline],
-) -> float:
-    """Backtest muito simplificado baseado em sinais da estratégia."""
+) -> Tuple[float, int]:
+    """Backtest com simulação de Trailing Stop."""
     strat: BaseStrategy = strategy_cls(params=strategy_params)
     strat.update_klines(klines[: strat.get_max_klines()])
+
+    from risk_management.trailing_stop import TrailingStop
+    ts = TrailingStop(
+        atr_multiplier=float(ts_params.get("atr_multiplier", 2.0)),
+        atr_period=int(ts_params.get("atr_period", 14))
+    )
 
     position_side = None
     entry_price = 0.0
     equity = 1.0
+    trade_count = 0
 
-    for k in klines:
-        strat.add_kline(k)
+    # Iterar a partir do ponto onde temos histórico suficiente
+    start_idx = strat.get_max_klines()
+    
+    # Simulação barra a barra
+    for i in range(start_idx, len(klines)):
+        current_kline = klines[i]
+        strat.add_kline(current_kline)
         res = strat.calculate_signal()
-        price = k.close
-
+        price = current_kline.close
+        
+        # 1. Verificar Stops e Saídas se estiver posicionado
+        if position_side is not None:
+            # Verificar Trailing Stop
+            stop_price = ts.update(price, strat.klines)
+            hit_stop = False
+            
+            if stop_price:
+                if position_side == "LONG" and price <= stop_price:
+                    hit_stop = True
+                elif position_side == "SHORT" and price >= stop_price:
+                    hit_stop = True
+            
+            # Verificar Sinal de Saída da Estratégia
+            signal_close = False
+            if position_side == "LONG" and res.signal.name in ("CLOSE_LONG", "SHORT"):
+                signal_close = True
+            elif position_side == "SHORT" and res.signal.name in ("CLOSE_SHORT", "LONG"):
+                signal_close = True
+            
+            # Executar saída
+            if hit_stop or signal_close:
+                # Calcular PnL
+                if position_side == "LONG":
+                    # Se foi stop, saiu no preço do stop (slippage ignorado)
+                    exit_p = stop_price if hit_stop else price
+                    ret = (exit_p - entry_price) / entry_price
+                else:
+                    exit_p = stop_price if hit_stop else price
+                    ret = (entry_price - exit_p) / entry_price
+                    
+                equity *= (1.0 + ret)
+                position_side = None
+                ts.deactivate()
+        
+        # 2. Verificar Entradas (se não estiver posicionado)
+        # Nota: Se acabou de fechar, aguarda próximo candle (simplificação)
         if position_side is None:
             if res.signal.name == "LONG":
                 position_side = "LONG"
                 entry_price = price
+                trade_count += 1
+                ts.activate(entry_price, "LONG", strat.klines)
             elif res.signal.name == "SHORT":
                 position_side = "SHORT"
                 entry_price = price
-        else:
-            if position_side == "LONG" and res.signal.name in ("CLOSE_LONG", "SHORT"):
-                ret = (price - entry_price) / entry_price
-                equity *= (1.0 + ret)
-                position_side = None
-            elif position_side == "SHORT" and res.signal.name in ("CLOSE_SHORT", "LONG"):
-                ret = (entry_price - price) / entry_price
-                equity *= (1.0 + ret)
-                position_side = None
+                trade_count += 1
+                ts.activate(entry_price, "SHORT", strat.klines)
 
-    return equity - 1.0
+    return equity - 1.0, trade_count
 
 
 def run_optimization(strategy_name: str = None) -> None:
@@ -169,8 +213,13 @@ def run_optimization(strategy_name: str = None) -> None:
     def objective(x: List[float]) -> float:
         strategy_params, ts_params = _params_from_vector(dim_names, x)
         logger.info(f"Avaliando params: strategy={strategy_params}, trailing={ts_params}")
-        total_return = _backtest(strategy_cls, strategy_params, klines)
-        logger.info(f"Retorno total: {total_return:.4f}")
+        total_return, trade_count = _backtest(strategy_cls, strategy_params, ts_params, klines)
+        logger.info(f"Retorno total: {total_return:.4f} | Trades: {trade_count}")
+        
+        # Penalizar estratégias com poucos trades (ex: menos de 5) para evitar overfitting em outliers
+        if trade_count < 5:
+            return 1.0  # Penalidade
+
         return -float(total_return)
 
     res = gp_minimize(
@@ -182,11 +231,14 @@ def run_optimization(strategy_name: str = None) -> None:
     )
 
     best_strategy_params, best_ts_params = _params_from_vector(dim_names, res.x)
-    best_return = -res.fun
+    
+    # Re-executar backtest com melhores parâmetros para obter métricas detalhadas
+    best_return, best_trade_count = _backtest(strategy_cls, best_strategy_params, best_ts_params, klines)
 
     logger.info("=" * 60)
     logger.info("Otimização concluída")
     logger.info(f"Melhor retorno: {best_return:.4f}")
+    logger.info(f"Total trades: {best_trade_count}")
     logger.info(f"Melhores parâmetros da estratégia: {best_strategy_params}")
     logger.info(f"Melhores parâmetros do trailing stop: {best_ts_params}")
     logger.info("=" * 60)
@@ -199,6 +251,7 @@ def run_optimization(strategy_name: str = None) -> None:
         "timeframe": Settings.TIMEFRAME,
         "metrics": {
             "total_return": best_return,
+            "total_trades": best_trade_count,
         },
     }
 
