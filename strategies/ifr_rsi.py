@@ -23,6 +23,7 @@ class IFRParams:
     atr_lookback_period: int = 20  # período para calcular média histórica do ATR
     atr_min_multiplier: float = 0.5  # múltiplo mínimo da média ATR (ex: 0.5 = 50% da média)
     atr_max_multiplier: float = 2.0  # múltiplo máximo da média ATR (ex: 2.0 = 200% da média)
+    ma_period: int = 200  # período da média móvel para filtro de tendência
 
 
 class IFRStrategy(BaseStrategy):
@@ -39,6 +40,7 @@ class IFRStrategy(BaseStrategy):
             atr_lookback_period=int(params.get("atr_lookback_period", 20)),
             atr_min_multiplier=float(params.get("atr_min_multiplier", 0.0)),  # 0.0 = desabilitar filtro
             atr_max_multiplier=float(params.get("atr_max_multiplier", 999.0)),  # 999.0 = desabilitar filtro
+            ma_period=int(params.get("ma_period", 200)),
         )
         # Último valor de RSI calculado (para logging/monitoramento)
         self.last_rsi: float | None = None
@@ -46,11 +48,12 @@ class IFRStrategy(BaseStrategy):
         self.last_atr: float | None = None
 
     def get_max_klines(self) -> int:
-        # Precisamos histórico suficiente para RSI, ATR e lookback do ATR
+        # Precisamos histórico suficiente para RSI, ATR, lookback do ATR e MA
         max_period = max(
             self.cfg.rsi_period,
             self.cfg.atr_period,
-            self.cfg.atr_lookback_period
+            self.cfg.atr_lookback_period,
+            self.cfg.ma_period
         )
         return max(max_period * 3, 100)
 
@@ -86,6 +89,22 @@ class IFRStrategy(BaseStrategy):
         try:
             atr_series = df.ta.atr(length=self.cfg.atr_period)
             return atr_series if atr_series is not None else pd.Series(dtype="float64")
+        except Exception:
+            return pd.Series(dtype="float64")
+    
+    def _compute_ma(self, closes: List[float]) -> pd.Series:
+        """
+        Calcula média móvel simples (SMA) usando pandas-ta.
+        Retorna série completa de valores MA.
+        """
+        if not closes or len(closes) < self.cfg.ma_period:
+            return pd.Series(dtype="float64")
+        
+        df = pd.DataFrame({"close": closes})
+        
+        try:
+            ma_series = df.ta.sma(close="close", length=self.cfg.ma_period)
+            return ma_series if ma_series is not None else pd.Series(dtype="float64")
         except Exception:
             return pd.Series(dtype="float64")
 
@@ -178,22 +197,56 @@ class IFRStrategy(BaseStrategy):
             # #endregion
 
         # ATR OK (dentro do range normal ou filtro desabilitado) - aplicar lógica RSI
+        
+        # Calcular média móvel para filtro de tendência
+        ma_series = self._compute_ma(closes)
+        if ma_series.empty or len(ma_series) == 0:
+            # Histórico insuficiente para calcular MA - bloquear entrada
+            return StrategyResult(
+                signal=Signal.NEUTRAL,
+                confidence=0.0,
+                entry_price=current_price,
+            )
+        
+        current_ma = float(ma_series.iloc[-1])
 
         # Lógica básica:
         # - RSI abaixo de oversold_level -> possível compra (LONG)
         # - RSI acima de overbought_level -> possível venda (SHORT)
-        if current_rsi <= self.cfg.oversold_level:
-            return StrategyResult(
-                signal=Signal.LONG,
-                confidence=min(1.0, (self.cfg.oversold_level - current_rsi) / 20.0),
-                entry_price=current_price,
-            )
-        elif current_rsi >= self.cfg.overbought_level:
-            return StrategyResult(
-                signal=Signal.SHORT,
-                confidence=min(1.0, (current_rsi - self.cfg.overbought_level) / 20.0),
-                entry_price=current_price,
-            )
+        signal_long = current_rsi <= self.cfg.oversold_level
+        signal_short = current_rsi >= self.cfg.overbought_level
+        
+        # Aplicar filtro de tendência MA:
+        # - LONG apenas se preço > MA (tendência de alta)
+        # - SHORT apenas se preço < MA (tendência de baixa)
+        if signal_long:
+            if current_price > current_ma:
+                return StrategyResult(
+                    signal=Signal.LONG,
+                    confidence=min(1.0, (self.cfg.oversold_level - current_rsi) / 20.0),
+                    entry_price=current_price,
+                )
+            else:
+                # Sinal LONG bloqueado por filtro de tendência (preço abaixo da MA)
+                return StrategyResult(
+                    signal=Signal.NEUTRAL,
+                    confidence=0.0,
+                    entry_price=current_price,
+                )
+        elif signal_short:
+            if current_price < current_ma:
+                return StrategyResult(
+                    signal=Signal.SHORT,
+                    confidence=min(1.0, (current_rsi - self.cfg.overbought_level) / 20.0),
+                    entry_price=current_price,
+                )
+            else:
+                # Sinal SHORT bloqueado por filtro de tendência (preço acima da MA)
+                return StrategyResult(
+                    signal=Signal.NEUTRAL,
+                    confidence=0.0,
+                    entry_price=current_price,
+                )
         else:
             return StrategyResult(
                 signal=Signal.NEUTRAL,
@@ -212,4 +265,5 @@ class IFRStrategy(BaseStrategy):
             "atr_lookback_period": (10, 50),  # período para calcular média histórica
             "atr_min_multiplier": (0.1, 1.0),  # múltiplo mínimo da média (ex: 0.3 = 30% da média)
             "atr_max_multiplier": (1.0, 3.0),  # múltiplo máximo da média (ex: 2.0 = 200% da média)
+            "ma_period": (150, 250),  # período da média móvel para filtro de tendência
         }
